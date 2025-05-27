@@ -5,42 +5,29 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from models import SimpleCNN
 
 
 class AdversarialDistillation:
     """
     对抗蒸馏防御方法
-    
-    Args:
-        student_model: 学生模型
-        teacher_model: 教师模型
-        temperature: 蒸馏温度
-        alpha: 蒸馏损失权重
     """
-    def __init__(self, student_model, teacher_model, temperature=100, alpha=0.7):
+    def __init__(self, student_model, device, temperature=100, alpha=0.7):
         self.student_model = student_model
-        self.teacher_model = teacher_model
+        self.device = device
         self.temperature = temperature
         self.alpha = alpha
-        self.device = next(student_model.parameters()).device
+        
+        # 创建教师模型（使用相同的架构）
+        self.teacher_model = SimpleCNN().to(device)
+        self.teacher_model.eval()
         
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(student_model.parameters(), lr=0.001)
-        
-        # 确保教师模型在评估模式
-        self.teacher_model.eval()
     
     def distillation_loss(self, student_outputs, teacher_outputs, temperature):
         """
         计算蒸馏损失
-        
-        Args:
-            student_outputs: 学生模型输出
-            teacher_outputs: 教师模型输出
-            temperature: 温度参数
-        
-        Returns:
-            loss: 蒸馏损失
         """
         soft_student = F.log_softmax(student_outputs / temperature, dim=1)
         soft_teacher = F.softmax(teacher_outputs / temperature, dim=1)
@@ -50,14 +37,6 @@ class AdversarialDistillation:
     def train_epoch(self, train_loader, epoch):
         """
         训练一个epoch
-        
-        Args:
-            train_loader: 训练数据加载器
-            epoch: 当前epoch
-        
-        Returns:
-            avg_loss: 平均损失
-            avg_acc: 平均准确率
         """
         self.student_model.train()
         total_loss = 0
@@ -96,7 +75,7 @@ class AdversarialDistillation:
             total += target.size(0)
             correct += predicted.eq(target).sum().item()
             
-            if batch_idx % 10 == 0:
+            if batch_idx % 50 == 0:
                 print(f'Epoch: {epoch}, Batch: {batch_idx}/{len(train_loader)}, '
                       f'Loss: {loss.item():.4f}, Acc: {100.*correct/total:.2f}%')
         

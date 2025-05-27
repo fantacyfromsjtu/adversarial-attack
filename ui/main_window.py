@@ -10,7 +10,6 @@ from models import SimpleCNN
 from config import WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT
 from .attack_widget import AttackWidget
 from .defense_widget import DefenseWidget
-from .visualization_widget import VisualizationWidget
 
 
 class MainWindow(QMainWindow):
@@ -34,8 +33,8 @@ class MainWindow(QMainWindow):
         # 创建主布局
         self.main_layout = QVBoxLayout(self.central_widget)
         
-        # 创建工具栏
-        self.create_toolbar()
+        # 创建菜单栏
+        self.create_menubar()
         
         # 创建标签页
         self.create_tabs()
@@ -43,7 +42,7 @@ class MainWindow(QMainWindow):
         # 创建状态栏
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage(f'设备: {self.device}')
+        self.status_bar.showMessage(f'设备: {self.device} | 模型未加载')
         
         # 应用样式
         self.setStyleSheet("""
@@ -79,26 +78,33 @@ class MainWindow(QMainWindow):
             }
         """)
     
-    def create_toolbar(self):
-        """创建工具栏"""
-        toolbar = self.addToolBar('工具栏')
-        toolbar.setMovable(False)
+    def create_menubar(self):
+        """创建菜单栏"""
+        menubar = self.menuBar()
         
-        # 加载模型按钮
-        load_model_action = QAction(QIcon(), '加载模型', self)
+        # 文件菜单
+        file_menu = menubar.addMenu('文件')
+        
+        # 加载模型
+        load_model_action = QAction('加载模型', self)
+        load_model_action.setShortcut('Ctrl+O')
         load_model_action.triggered.connect(self.load_model)
-        toolbar.addAction(load_model_action)
+        file_menu.addAction(load_model_action)
         
-        # 训练模型按钮
-        train_model_action = QAction(QIcon(), '训练模型', self)
-        train_model_action.triggered.connect(self.train_model)
-        toolbar.addAction(train_model_action)
+        file_menu.addSeparator()
         
-        toolbar.addSeparator()
+        # 退出
+        exit_action = QAction('退出', self)
+        exit_action.setShortcut('Ctrl+Q')
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
         
-        # 模型信息标签
-        self.model_info_label = QLabel('模型未加载')
-        toolbar.addWidget(self.model_info_label)
+        # 帮助菜单
+        help_menu = menubar.addMenu('帮助')
+        
+        about_action = QAction('关于', self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
     
     def create_tabs(self):
         """创建标签页"""
@@ -107,15 +113,11 @@ class MainWindow(QMainWindow):
         
         # 攻击模块标签页
         self.attack_widget = AttackWidget(self)
-        self.tab_widget.addTab(self.attack_widget, "攻击模块")
+        self.tab_widget.addTab(self.attack_widget, "攻击与分析")
         
         # 防御模块标签页
         self.defense_widget = DefenseWidget(self)
         self.tab_widget.addTab(self.defense_widget, "防御模块")
-        
-        # 可视化模块标签页
-        self.visualization_widget = VisualizationWidget(self)
-        self.tab_widget.addTab(self.visualization_widget, "可视化")
     
     def load_model(self):
         """加载模型"""
@@ -127,32 +129,40 @@ class MainWindow(QMainWindow):
         if model_path:
             try:
                 self.model = SimpleCNN().to(self.device)
+                
+                # 尝试加载模型
                 checkpoint = torch.load(model_path, map_location=self.device)
-                self.model.load_state_dict(checkpoint['model_state_dict'])
+                
+                # 检查是否是完整的checkpoint还是只有state_dict
+                if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                    self.model.load_state_dict(checkpoint['model_state_dict'])
+                elif isinstance(checkpoint, dict):
+                    # 假设这是一个state_dict
+                    self.model.load_state_dict(checkpoint)
+                else:
+                    # 可能是旧格式的模型
+                    self.model.load_state_dict(checkpoint)
+                    
                 self.model.eval()
                 
-                self.model_info_label.setText(f'已加载模型: {model_path.split("/")[-1]}')
-                self.status_bar.showMessage('模型加载成功！')
+                model_name = model_path.split("/")[-1]
+                self.status_bar.showMessage(f'设备: {self.device} | 已加载模型: {model_name}')
                 
                 # 通知各个标签页模型已加载
                 self.attack_widget.on_model_loaded()
                 self.defense_widget.on_model_loaded()
-                self.visualization_widget.on_model_loaded()
+                
+                QMessageBox.information(self, "成功", f"模型 {model_name} 加载成功！")
                 
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"加载模型失败：{str(e)}")
     
-    def train_model(self):
-        """训练模型"""
-        reply = QMessageBox.question(
-            self, '训练模型', 
-            '是否要训练一个新的CNN模型？\n这将需要一些时间。',
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
-            # 这里可以打开一个训练对话框或启动训练线程
-            QMessageBox.information(self, "提示", "训练功能将在后续版本中实现。")
+    def show_about(self):
+        """显示关于对话框"""
+        QMessageBox.about(self, "关于", 
+                         "对抗攻击与防御演示系统\n\n"
+                         "基于PyTorch和PyQt5开发\n"
+                         "用于演示深度学习模型的安全性问题")
     
     def get_model(self):
         """获取当前模型"""

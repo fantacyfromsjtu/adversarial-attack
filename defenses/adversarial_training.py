@@ -4,50 +4,24 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from attacks import FGSM, PGD
+from attacks import FGSM
 
 
 class AdversarialTraining:
     """
     对抗训练防御方法
-    
-    Args:
-        model: 要训练的模型
-        attack_method: 攻击方法 ('fgsm' 或 'pgd')
-        epsilon: 扰动强度
-        alpha: PGD步长
-        num_steps: PGD迭代次数
     """
-    def __init__(self, model, attack_method='pgd', epsilon=0.03, alpha=0.01, num_steps=10):
+    def __init__(self, model, device, epsilon=0.03):
         self.model = model
-        self.attack_method = attack_method
+        self.device = device
         self.epsilon = epsilon
-        self.alpha = alpha
-        self.num_steps = num_steps
-        self.device = next(model.parameters()).device
-        
-        # 初始化攻击方法
-        if attack_method == 'fgsm':
-            self.attacker = FGSM(model, epsilon=epsilon)
-        elif attack_method == 'pgd':
-            self.attacker = PGD(model, epsilon=epsilon, alpha=alpha, num_steps=num_steps)
-        else:
-            raise ValueError(f"不支持的攻击方法: {attack_method}")
-        
+        self.attacker = FGSM(model, epsilon=epsilon)
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(model.parameters(), lr=0.001)
     
     def train_epoch(self, train_loader, epoch):
         """
         训练一个epoch
-        
-        Args:
-            train_loader: 训练数据加载器
-            epoch: 当前epoch
-        
-        Returns:
-            avg_loss: 平均损失
-            avg_acc: 平均准确率
         """
         self.model.train()
         total_loss = 0
@@ -58,8 +32,8 @@ class AdversarialTraining:
             data, target = data.to(self.device), target.to(self.device)
             
             # 生成对抗样本
-            with torch.no_grad():
-                adv_data, _ = self.attacker.generate(data, target)
+            self.model.train()  # 确保模型在训练模式
+            adv_data, _ = self.attacker.generate(data, target)
             
             # 清零梯度
             self.optimizer.zero_grad()
@@ -84,7 +58,7 @@ class AdversarialTraining:
             total += target.size(0)
             correct += predicted.eq(target).sum().item()
             
-            if batch_idx % 10 == 0:
+            if batch_idx % 50 == 0:
                 print(f'Epoch: {epoch}, Batch: {batch_idx}/{len(train_loader)}, '
                       f'Loss: {loss.item():.4f}, Acc: {100.*correct/total:.2f}%')
         
