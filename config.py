@@ -78,12 +78,8 @@ ATTACK_PARAMS = {
 DEFENSE_PARAMS = {
     'adversarial_training': {
         'epsilon': 0.03,
-        'alpha': 0.01,
-        'num_steps': 10
-    },
-    'adversarial_distillation': {
-        'temperature': 100,
-        'alpha': 0.7
+        'learning_rate': 0.001,
+        'epochs': 10
     }
 }
 
