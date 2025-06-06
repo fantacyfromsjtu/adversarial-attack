@@ -99,13 +99,7 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
-        # 帮助菜单
-        help_menu = menubar.addMenu('帮助')
-        
-        about_action = QAction('关于', self)
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
-    
+
     def create_tabs(self):
         """创建标签页"""
         self.tab_widget = QTabWidget()
@@ -156,13 +150,7 @@ class MainWindow(QMainWindow):
                 
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"加载模型失败：{str(e)}")
-    
-    def show_about(self):
-        """显示关于对话框"""
-        QMessageBox.about(self, "关于", 
-                         "对抗攻击与防御演示系统\n\n"
-                         "基于PyTorch和PyQt5开发\n"
-                         "用于演示深度学习模型的安全性问题")
+
     
     def get_model(self):
         """获取当前模型"""
