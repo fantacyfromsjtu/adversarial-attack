@@ -220,12 +220,11 @@ class AttackWidget(QWidget):
         self.jsma_params = {
             'theta': QDoubleSpinBox(),
             'gamma': QDoubleSpinBox(),
-            'max_iter': QSpinBox(),
-            'target': QSpinBox()
+            'max_iter': QSpinBox()
         }
         self.jsma_params['theta'].setRange(0.01, 1.0)
         self.jsma_params['theta'].setSingleStep(0.01)
-        self.jsma_params['theta'].setValue(ATTACK_PARAMS['JSMA']['theta'] if 'theta' in ATTACK_PARAMS['JSMA'] else 0.1)
+        self.jsma_params['theta'].setValue(ATTACK_PARAMS['JSMA']['theta'] if 'theta' in ATTACK_PARAMS['JSMA'] else 0.2)
         
         self.jsma_params['gamma'].setRange(0.01, 1.0)
         self.jsma_params['gamma'].setSingleStep(0.01)
@@ -233,9 +232,6 @@ class AttackWidget(QWidget):
         
         self.jsma_params['max_iter'].setRange(10, 5000)
         self.jsma_params['max_iter'].setValue(ATTACK_PARAMS['JSMA']['max_iter'] if 'max_iter' in ATTACK_PARAMS['JSMA'] else 100)
-        
-        self.jsma_params['target'].setRange(-1, 9)  # -1表示无目标攻击，0-9表示目标类别
-        self.jsma_params['target'].setValue(-1)  # 默认为无目标攻击
         
         # 初始显示FGSM参数
         self.update_parameter_panel('FGSM')
@@ -306,7 +302,7 @@ class AttackWidget(QWidget):
         self.asr_jsma_theta = QDoubleSpinBox()
         self.asr_jsma_theta.setRange(0.01, 1.0)
         self.asr_jsma_theta.setSingleStep(0.01)
-        self.asr_jsma_theta.setValue(ATTACK_PARAMS['JSMA']['theta'] if 'theta' in ATTACK_PARAMS['JSMA'] else 0.1)
+        self.asr_jsma_theta.setValue(ATTACK_PARAMS['JSMA']['theta'] if 'theta' in ATTACK_PARAMS['JSMA'] else 0.2)
         layout.addRow("修改幅度 (θ):", self.asr_jsma_theta)
 
         self.asr_jsma_gamma = QDoubleSpinBox()
@@ -319,11 +315,6 @@ class AttackWidget(QWidget):
         self.asr_jsma_max_iterations.setRange(10, 5000)
         self.asr_jsma_max_iterations.setValue(ATTACK_PARAMS['JSMA']['max_iter'] if 'max_iter' in ATTACK_PARAMS['JSMA'] else 100)
         layout.addRow("最大迭代:", self.asr_jsma_max_iterations)
-        
-        self.asr_jsma_target = QSpinBox()
-        self.asr_jsma_target.setRange(-1, 9)  # -1表示无目标攻击，0-9表示目标类别
-        self.asr_jsma_target.setValue(-1)  # 默认为无目标攻击
-        layout.addRow("目标类别 (-1为无目标):", self.asr_jsma_target)
         
         group.setVisible(False)
         return group
@@ -473,7 +464,6 @@ class AttackWidget(QWidget):
             self.param_layout.addRow("修改幅度 (θ):", self.jsma_params['theta'])
             self.param_layout.addRow("修改像素比例 (γ):", self.jsma_params['gamma'])
             self.param_layout.addRow("最大迭代:", self.jsma_params['max_iter'])
-            #self.param_layout.addRow("目标类别 (-1为无目标):", self.jsma_params['target'])
             for widget in self.jsma_params.values():
                 widget.show()
         else:
@@ -562,10 +552,6 @@ class AttackWidget(QWidget):
                           steps=self.cw_params['steps'].value(),
                           lr=self.cw_params['lr'].value())
         elif attack_method == 'JSMA':
-            # 处理目标类别参数
-            target_val = self.jsma_params['target'].value()
-            target = None if target_val == -1 else target_val
-            
             attacker = JSMA(model, 
                             theta=self.jsma_params['theta'].value(),
                             gamma=self.jsma_params['gamma'].value(),
@@ -766,10 +752,6 @@ class AttackWidget(QWidget):
         if 'JSMA' in attack_methods_to_run:
             self.analysis_text.append("测试JSMA攻击 (使用指定参数)...")
             QApplication.processEvents()
-            
-            # 处理目标类别参数
-            target_val = self.asr_jsma_target.value()
-            target = None if target_val == -1 else target_val
             
             jsma_attacker = JSMA(model, 
                                  theta=self.asr_jsma_theta.value(),

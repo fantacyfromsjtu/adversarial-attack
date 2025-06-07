@@ -68,7 +68,7 @@ ATTACK_PARAMS = {
         'learning_rate': 0.01
     },
     'JSMA': {
-        'theta': 1.0,
+        'theta': 0.2,
         'gamma': 0.1,
         'max_iterations': 2000
     }
