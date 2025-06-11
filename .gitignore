@@ -247,7 +247,6 @@ events.out.tfevents.*
 
 # Matplotlib生成的文件
 *.png
-*.pdf
 *.svg
 # 但保留文档中的图片
 !docs/**/*.png
