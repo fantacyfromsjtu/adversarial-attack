@@ -50,8 +50,8 @@ class DefenseWidget(QWidget):
         param_layout.addRow("训练轮数 (Epochs):", self.epochs_spin)
         
         self.lr_spin = QDoubleSpinBox()
-        self.lr_spin.setRange(0.0001, 0.1)
-        self.lr_spin.setSingleStep(0.0001)
+        self.lr_spin.setRange(0.001, 0.1)
+        self.lr_spin.setSingleStep(0.001)
         self.lr_spin.setValue(DEFENSE_PARAMS.get('adversarial_training', {}).get('learning_rate', 0.001)) # Safely get params
         self.lr_spin.setDecimals(4)
         param_layout.addRow("学习率 (Learning Rate):", self.lr_spin)
@@ -312,15 +312,15 @@ class TrainingThread(QThread):
         """执行训练任务 (仅对抗训练)"""
         self._is_running = True
         history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
-        
+
         try:
             self.info_updated.emit(f"初始化对抗训练...")
-            
+
             if not (hasattr(self.parent_widget.parent, 'model') and self.parent_widget.parent.model):
                 self.info_updated.emit("错误: 执行对抗训练前，请先在主窗口加载一个模型。")
                 self.training_completed.emit(False, "对抗训练失败: 学生模型未加载。", {})
                 return
-            
+
             self.model = self.parent_widget.parent.model
             self.model.to(self.device)
 
@@ -329,7 +329,7 @@ class TrainingThread(QThread):
             self.info_updated.emit(f"使用对抗训练，扰动强度 ε={self.epsilon}")
             trainer_instance = AdversarialTraining(self.model, self.device, epsilon=self.epsilon)
             trainer_instance.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
-            
+
             for epoch in range(1, self.epochs + 1):
                 if not self._is_running:
                     self.info_updated.emit("训练已手动停止。")
@@ -338,10 +338,10 @@ class TrainingThread(QThread):
                 self.info_updated.emit(f"Epoch {epoch}/{self.epochs} 开始...")
                 self.model.train() # 确保模型在训练模式
                 train_loss, train_acc = trainer_instance.train_epoch(train_loader, epoch)
-                
+
                 history['train_loss'].append(train_loss)
                 history['train_acc'].append(train_acc)
-                
+
                 val_acc, val_loss = self.validate(test_loader, self.device, 
                                                   use_adv_eval=True, # 对抗训练在验证时也使用对抗样本
                                                   trainer_instance=trainer_instance)
@@ -360,7 +360,7 @@ class TrainingThread(QThread):
                 self.info_updated.emit("对抗训练成功完成。")
                 if not os.path.exists(MODEL_DIR):
                     os.makedirs(MODEL_DIR)
-                
+
                 base_model_name = "model" 
                 current_model_name_in_main_window = "unknown_model"
                 if hasattr(self.parent_widget.parent, 'status_bar') and self.parent_widget.parent.status_bar.currentMessage().startswith("设备:") and "已加载模型: " in self.parent_widget.parent.status_bar.currentMessage():
@@ -373,7 +373,7 @@ class TrainingThread(QThread):
 
                 saved_model_name = f"{base_model_name}_adv_trained.pth"
                 saved_model_path = os.path.join(MODEL_DIR, saved_model_name)
-                
+
                 torch.save({'model_state_dict': self.model.state_dict(), 
                             'epoch': self.epochs,
                             'model_name': saved_model_name}, 
@@ -393,44 +393,52 @@ class TrainingThread(QThread):
             import traceback
             self.info_updated.emit(traceback.format_exc())
             self.training_completed.emit(False, f"对抗训练失败: {e}", {'history': history})
-            
+
+
     def validate(self, test_loader, device, use_adv_eval=False, trainer_instance=None):
         """验证模型"""
         if not self.model:
             self.info_updated.emit("错误: 验证时模型未初始化。")
-            return 0, float('inf')
+            return 0, float("inf")
 
-        self.model.eval() # 设置为评估模式
+        self.model.eval()  # 设置为评估模式
         total_loss = 0
         correct = 0
         total = 0
         criterion = nn.CrossEntropyLoss()
-        
-        with torch.no_grad():
-            for data, target in test_loader:
-                data_eval, target_eval = data.to(device), target.to(device)
-                
-                if use_adv_eval and trainer_instance and hasattr(trainer_instance, 'attacker'):
-                    # 对抗训练的验证集也使用对抗样本
-                    # 确保攻击器使用当前评估模式的模型
-                    original_attacker_model_mode = trainer_instance.attacker.model.training
-                    trainer_instance.attacker.model.eval() 
-                    
-                    adv_data, _ = trainer_instance.attacker.generate(data_eval, target_eval)
-                    
-                    trainer_instance.attacker.model.train(original_attacker_model_mode) # 恢复攻击器模型的原始模式
-                    data_eval = adv_data
-                
+
+        for data, target in test_loader:
+            data_eval, target_eval = data.to(device), target.to(device)
+
+            if use_adv_eval and trainer_instance and hasattr(trainer_instance, "attacker"):
+                # 对抗训练的验证集也使用对抗样本
+                # 为生成对抗样本启用梯度计算
+                data_eval = data_eval.clone().detach().requires_grad_(True)
+
+                # 确保攻击器使用当前评估模式的模型
+                original_attacker_model_mode = trainer_instance.attacker.model.training
+                trainer_instance.attacker.model.eval()
+
+                # 生成对抗样本 - 需要梯度计算，所以不能在 torch.no_grad() 中
+                adv_data, _ = trainer_instance.attacker.generate(data_eval, target_eval)
+
+                trainer_instance.attacker.model.train(
+                    original_attacker_model_mode
+                )  # 恢复攻击器模型的原始模式
+                data_eval = adv_data.detach()  # 分离梯度，避免后续计算中的梯度传播
+
+            # 模型预测和损失计算
+            with torch.no_grad():
                 outputs = self.model(data_eval)
                 loss = criterion(outputs, target_eval)
-                
+
                 total_loss += loss.item()
                 _, predicted = outputs.max(1)
                 total += target_eval.size(0)
                 correct += predicted.eq(target_eval).sum().item()
-        
-        accuracy = 100. * correct / total if total > 0 else 0
-        avg_loss = total_loss / len(test_loader) if len(test_loader) > 0 else float('inf')
-        
+
+        accuracy = 100.0 * correct / total if total > 0 else 0
+        avg_loss = total_loss / len(test_loader) if len(test_loader) > 0 else float("inf")
+
         # self.model.train() # 在run循环的下一轮迭代开始时会设置 train()
-        return accuracy, avg_loss 
+        return accuracy, avg_loss
