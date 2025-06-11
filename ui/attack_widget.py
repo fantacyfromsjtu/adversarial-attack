@@ -348,7 +348,7 @@ class AttackWidget(QWidget):
         self.epsilon_steps = QSpinBox()
         self.epsilon_steps.setRange(3, 20)
         self.epsilon_steps.setValue(6)
-        epsilon_layout.addRow("扰动步数:", self.epsilon_steps)
+        epsilon_layout.addRow("采样步数:", self.epsilon_steps)
         main_layout.addWidget(self.epsilon_effect_params_group)
 
         # ASR Mode - Common Parameters (like its own sample size)

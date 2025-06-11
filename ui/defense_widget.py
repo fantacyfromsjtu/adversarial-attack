@@ -81,7 +81,7 @@ class DefenseWidget(QWidget):
         self.evaluate_btn = QPushButton("评估模型")
         self.evaluate_btn.clicked.connect(self.evaluate_model)
         self.evaluate_btn.setEnabled(False) # 评估按钮初始不可用，直到有模型为止
-        button_layout.addWidget(self.evaluate_btn)
+        #button_layout.addWidget(self.evaluate_btn)
         
         button_layout.addStretch()
         layout.addLayout(button_layout)
